@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guess the Secret Number</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a polished look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            /* More rounded */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            /* Stronger shadow */
+            max-width: 480px;
+            width: 100%;
+            padding: 2rem;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .game-container:hover {
+            transform: translateY(-5px);
+        }
+
+        .feedback-message {
+            font-weight: 600;
+            padding: 0.5rem 0;
+            min-height: 2.5rem;
+            /* Ensure stability */
+            text-align: center;
+        }
+
+        .btn-primary {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn-primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        #guessInput {
+            -moz-appearance: textfield;
+            /* Firefox spinner removal */
+        }
+
+        #guessInput::-webkit-outer-spin-button,
+        #guessInput::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game" class="game-container">
+        <h1 class="text-4xl font-extrabold text-center text-gray-800 mb-2">Guessing Game</h1>
+        <p class="text-center text-gray-600 mb-6">I'm thinking of a number between 1 and 100.</p>
+
+        <!-- Game Status and Counters -->
+        <div class="flex justify-between items-center bg-blue-50 p-4 rounded-xl mb-6 shadow-inner">
+            <div class="text-center">
+                <p class="text-sm font-medium text-blue-600">Guesses Left:</p>
+                <p id="guessesLeft" class="text-2xl font-bold text-blue-800">10</p>
+            </div>
+            <div class="text-center">
+                <p class="text-sm font-medium text-blue-600">Attempts:</p>
+                <p id="guessCount" class="text-2xl font-bold text-blue-800">0</p>
+            </div>
+        </div>
+
+        <!-- Input and Submit -->
+        <div class="mb-4 flex gap-2">
+            <input type="number" id="guessInput" min="1" max="100" placeholder="Enter your guess (1-100)"
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-lg shadow-sm"
+                autofocus>
+            <button id="submitGuess"
+                class="btn-primary bg-blue-600 text-white p-3 rounded-lg font-semibold shadow-md hover:bg-blue-700 transition duration-150 ease-in-out">
+                Submit
+            </button>
+        </div>
+
+        <!-- Feedback Message Area -->
+        <div id="feedback" class="feedback-message text-gray-700 mb-4">
+            Start guessing!
+        </div>
+
+        <!-- Previous Guesses List -->
+        <div class="mt-6">
+            <h3 class="text-xl font-semibold text-gray-800 mb-3 border-b pb-1">Your Previous Guesses:</h3>
+            <p id="previousGuesses" class="text-gray-500 text-base italic h-10 overflow-auto">None yet.</p>
+        </div>
+
+        <!-- Restart Button (Hidden initially) -->
+        <button id="restartButton"
+            class="hidden w-full bg-green-500 text-white p-3 rounded-lg font-bold text-lg mt-6 shadow-lg hover:bg-green-600 transition duration-150 ease-in-out">
+            Play Again
+        </button>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const MIN_NUMBER = 1;
+        const MAX_NUMBER = 100;
+        const MAX_GUESSES = 7;
+        const API_KEY = ""; // Not used for this local game logic
+
+        // --- DOM Elements ---
+        const guessInput = document.getElementById('guessInput');
+        const submitButton = document.getElementById('submitGuess');
+        const feedback = document.getElementById('feedback');
+        const guessCountDisplay = document.getElementById('guessCount');
+        const guessesLeftDisplay = document.getElementById('guessesLeft');
+        const previousGuessesDisplay = document.getElementById('previousGuesses');
+        const restartButton = document.getElementById('restartButton');
+
+        // --- Game State Variables ---
+        let secretNumber;
+        let guessCount;
+        let previousGuesses;
+        let gameOver;
+
+        // --- Initialization Function ---
+        function initializeGame() {
+            // Generate a random number (inclusive)
+            secretNumber = Math.floor(Math.random() * (MAX_NUMBER - MIN_NUMBER + 1)) + MIN_NUMBER;
+            guessCount = 0;
+            previousGuesses = [];
+            gameOver = false;
+
+            // Reset UI
+            guessInput.value = '';
+            guessInput.disabled = false;
+            submitButton.disabled = false;
+            restartButton.classList.add('hidden');
+            feedback.textContent = 'Enter your first guess!';
+            feedback.className = 'feedback-message text-gray-700 mb-4';
+            guessCountDisplay.textContent = guessCount;
+            guessesLeftDisplay.textContent = MAX_GUESSES;
+            previousGuessesDisplay.textContent = 'None yet.';
+
+            console.log('New secret number is:', secretNumber); // For testing
+        }
+
+        // --- Core Logic Function ---
+        function checkGuess() {
+            if (gameOver) return;
+
+            const rawGuess = guessInput.value.trim();
+            const guess = parseInt(rawGuess, 10);
+
+            // 1. Input Validation
+            if (rawGuess === '' || isNaN(guess) || guess < MIN_NUMBER || guess > MAX_NUMBER) {
+                feedback.textContent = `Please enter a valid number between ${MIN_NUMBER} and ${MAX_NUMBER}.`;
+                feedback.className = 'feedback-message text-red-500 mb-4';
+                return;
+            }
+
+            // 2. Check if already guessed
+            if (previousGuesses.includes(guess)) {
+                feedback.textContent = `You already guessed ${guess}. Try a new number!`;
+                feedback.className = 'feedback-message text-yellow-500 mb-4';
+                guessInput.value = '';
+                return;
+            }
+
+            // 3. Update State
+            guessCount++;
+            previousGuesses.push(guess);
+
+            // 4. Update UI Counters
+            guessCountDisplay.textContent = guessCount;
+            guessesLeftDisplay.textContent = MAX_GUESSES - guessCount;
+            previousGuessesDisplay.textContent = previousGuesses.join(', ');
+
+            // 5. Game Outcome Check
+            if (guess === secretNumber) {
+                // WIN
+                feedback.textContent = `🥳 Congratulations! You guessed the number ${secretNumber} in ${guessCount} attempts!`;
+                feedback.className = 'feedback-message text-green-700 bg-green-100 p-2 rounded-lg mb-4';
+                setGameOver(true);
+            } else if (guessCount >= MAX_GUESSES) {
+                // LOSE (Ran out of guesses)
+                feedback.textContent = `😔 GAME OVER! You ran out of guesses. The secret number was ${secretNumber}.`;
+                feedback.className = 'feedback-message text-red-700 bg-red-100 p-2 rounded-lg mb-4';
+                setGameOver(true);
+            } else {
+                // HINT
+                const hint = guess < secretNumber ? 'Too Low! Try a higher number.' : 'Too High! Try a lower number.';
+                feedback.textContent = hint;
+                feedback.className = `feedback-message mb-4 ${guess < secretNumber ? 'text-blue-500' : 'text-orange-500'}`;
+            }
+
+            guessInput.value = '';
+            guessInput.focus(); // Keep focus on the input for quick guessing
+        }
+
+        // --- Game Over Handler ---
+        function setGameOver(hasWon) {
+            gameOver = true;
+            guessInput.disabled = true;
+            submitButton.disabled = true;
+            restartButton.classList.remove('hidden');
+
+            // Optional: Change button color based on win/loss
+            if (hasWon) {
+                restartButton.classList.replace('bg-green-500', 'bg-lime-600');
+            } else {
+                restartButton.classList.replace('bg-lime-600', 'bg-green-500');
+            }
+        }
+
+        // --- Event Listeners ---
+        submitButton.addEventListener('click', checkGuess);
+
+        guessInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkGuess();
+            }
+        });
+
+        restartButton.addEventListener('click', initializeGame);
+
+        // Initialize the game when the page loads
+        window.onload = initializeGame;
+
+    </script>
+
+</body>
+
+</html>
